@@ -10,7 +10,9 @@ async function checkAdmin() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) {
+    redirect("/login");
+  }
 
   const { data: profile, error } = await supabase
     .from("profiles")
@@ -44,6 +46,59 @@ export async function updatePlaylist(
     );
   }
 
+  // Prevent duplicate playlist names on the same channel.
+  const { data: duplicatePlaylist, error: duplicateError } =
+    await supabase
+      .from("playlists")
+      .select("id")
+      .eq("channel_id", channelId)
+      .ilike("name", name)
+      .neq("id", playlistId)
+      .maybeSingle();
+
+  if (duplicateError) {
+    redirect(
+      `/admin/playlists/${playlistId}/edit?error=${encodeURIComponent(
+        duplicateError.message
+      )}`
+    );
+  }
+
+  if (duplicatePlaylist) {
+    redirect(
+      `/admin/playlists/${playlistId}/edit?error=${encodeURIComponent(
+        "A playlist with this name already exists for this channel"
+      )}`
+    );
+  }
+
+  // An active playlist must contain at least one video.
+  if (isActive) {
+    const { count, error: countError } = await supabase
+      .from("playlist_items")
+      .select("id", {
+        count: "exact",
+        head: true,
+      })
+      .eq("playlist_id", playlistId);
+
+    if (countError) {
+      redirect(
+        `/admin/playlists/${playlistId}/edit?error=${encodeURIComponent(
+          countError.message
+        )}`
+      );
+    }
+
+    if (!count || count === 0) {
+      redirect(
+        `/admin/playlists/${playlistId}/edit?error=${encodeURIComponent(
+          "An active playlist must contain at least one video"
+        )}`
+      );
+    }
+  }
+
   const { error } = await supabase
     .from("playlists")
     .update({
@@ -68,7 +123,6 @@ export async function updatePlaylist(
 export async function deletePlaylist(playlistId: string) {
   const supabase = await checkAdmin();
 
-  // Remove videos from the playlist first.
   const { error: itemsError } = await supabase
     .from("playlist_items")
     .delete()

@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import type { Video } from "@/types/database";
 import VideoDeleteButton from "@/app/admin/video-delete/button";
+
 export default async function VideosPage() {
   const supabase = await createSupabaseServerClient();
 
@@ -53,29 +55,30 @@ export default async function VideosPage() {
             </p>
           </div>
 
-          <a
+          <Link
             href="/admin"
             className="inline-flex w-fit items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
           >
             ← Dashboard
-          </a>
+          </Link>
         </div>
 
         {/* Top controls */}
         <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm text-slate-400">Total Videos</p>
+
             <p className="mt-1 text-2xl font-bold">
               {videoList.length}
             </p>
           </div>
 
-         <a
-  href="/admin/videos/new"
-  className="inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 sm:w-auto"
->
-  + Add Video
-</a>
+          <Link
+            href="/admin/videos/new"
+            className="inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 sm:w-auto"
+          >
+            + Add Video
+          </Link>
         </div>
 
         {/* Error */}
@@ -184,12 +187,12 @@ export default async function VideosPage() {
 
                       <td className="px-5 py-5">
                         <div className="flex justify-end gap-2">
-                          <a
-  href={`/admin/videos/${video.id}`}
-  className="inline-flex items-center justify-center rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
->
-  Edit
-</a>
+                          <Link
+                            href={`/admin/videos/${video.id}`}
+                            className="inline-flex items-center justify-center rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
+                          >
+                            Edit
+                          </Link>
 
                           <VideoDeleteButton videoId={video.id} />
                         </div>
@@ -239,14 +242,20 @@ export default async function VideosPage() {
 
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                     <div className="rounded-xl bg-slate-950/60 p-3">
-                      <p className="text-xs text-slate-500">Duration</p>
+                      <p className="text-xs text-slate-500">
+                        Duration
+                      </p>
+
                       <p className="mt-1 font-medium text-slate-200">
                         {formatDuration(video.duration_seconds)}
                       </p>
                     </div>
 
                     <div className="rounded-xl bg-slate-950/60 p-3">
-                      <p className="text-xs text-slate-500">Created</p>
+                      <p className="text-xs text-slate-500">
+                        Created
+                      </p>
+
                       <p className="mt-1 font-medium text-slate-200">
                         {formatDate(video.created_at)}
                       </p>
@@ -254,19 +263,14 @@ export default async function VideosPage() {
                   </div>
 
                   <div className="mt-4 flex gap-2">
-                    <button
-                      type="button"
-                      className="flex-1 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800"
+                    <Link
+                      href={`/admin/videos/${video.id}`}
+                      className="flex-1 rounded-xl border border-slate-700 px-4 py-2.5 text-center text-sm font-semibold text-slate-300 transition hover:bg-slate-800"
                     >
                       Edit
-                    </button>
+                    </Link>
 
-                    <button
-                      type="button"
-                      className="flex-1 rounded-xl border border-red-900/60 px-4 py-2.5 text-sm font-semibold text-red-400 transition hover:bg-red-950/40"
-                    >
-                      Delete
-                    </button>
+                    <VideoDeleteButton videoId={video.id} />
                   </div>
                 </div>
               </article>

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { createVideo } from "./actions";
 
@@ -42,12 +43,12 @@ export default async function NewVideoPage({
 
         {/* Header */}
         <div className="mb-6">
-          <a
+          <Link
             href="/admin/videos"
             className="text-sm font-medium text-blue-400 transition hover:text-blue-300"
           >
             ← Back to Video Library
-          </a>
+          </Link>
 
           <p className="mt-5 text-sm font-medium text-blue-400">
             Content Management
@@ -209,12 +210,12 @@ export default async function NewVideoPage({
 
             {/* Buttons */}
             <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-6 sm:flex-row sm:justify-end">
-              <a
+              <Link
                 href="/admin/videos"
                 className="inline-flex items-center justify-center rounded-xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800"
               >
                 Cancel
-              </a>
+              </Link>
 
               <button
                 type="submit"

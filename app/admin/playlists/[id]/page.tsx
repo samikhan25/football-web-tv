@@ -297,12 +297,13 @@ export default async function PlaylistDetailsPage({
                         <div className="relative hidden h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-800 sm:block">
                           {video.thumbnail_url ? (
                             <Image
-                              src={video.thumbnail_url}
-                              alt=""
-                              fill
-                              sizes="80px"
-                              className="object-cover"
-                            />
+  src={video.thumbnail_url}
+  alt=""
+  fill
+  sizes="80px"
+  unoptimized
+  className="object-cover"
+/>
                           ) : (
                             <div className="flex h-full items-center justify-center text-xs text-slate-600">
                               No image
@@ -429,12 +430,13 @@ export default async function PlaylistDetailsPage({
                     <div className="relative hidden h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-800 sm:block">
                       {video.thumbnail_url ? (
                         <Image
-                          src={video.thumbnail_url}
-                          alt=""
-                          fill
-                          sizes="64px"
-                          className="object-cover"
-                        />
+  src={video.thumbnail_url}
+  alt=""
+  fill
+  sizes="64px"
+  unoptimized
+  className="object-cover"
+/>
                       ) : (
                         <div className="flex h-full items-center justify-center text-[10px] text-slate-600">
                           No image
