@@ -82,7 +82,9 @@ export default async function AdminPage() {
               <a href="/admin/schedule">
   <SidebarItem icon="◷" label="Schedule" />
 </a>
-              <SidebarItem icon="●" label="Live Streams" />
+              <a href="/admin/livestreams">
+  <SidebarItem icon="●" label="Live Streams" />
+</a>
               <SidebarItem icon="▤" label="Channels" />
             </div>
 
