@@ -29,7 +29,6 @@ export default async function AdminPage() {
   return (
     <main className="min-h-screen bg-[#0b1020] text-white">
       <div className="flex min-h-screen">
-
         {/* Desktop Sidebar */}
         <aside className="hidden w-64 shrink-0 border-r border-slate-800 bg-slate-950 lg:flex lg:flex-col">
           <div className="border-b border-slate-800 px-6 py-5">
@@ -116,7 +115,6 @@ export default async function AdminPage() {
 
         {/* Main Content */}
         <div className="min-w-0 flex-1">
-
           {/* Top Bar */}
           <header className="border-b border-slate-800 bg-slate-950/80 px-4 py-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between gap-4">
@@ -143,7 +141,6 @@ export default async function AdminPage() {
           </header>
 
           <div className="px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-8">
-
             {/* Welcome */}
             <section className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-5 sm:p-6">
               <p className="text-sm font-medium text-blue-400">
@@ -158,6 +155,55 @@ export default async function AdminPage() {
                 Manage your football TV content, livestreams,
                 playlists, schedules, and channels from one place.
               </p>
+            </section>
+
+            {/* Admin Account Information */}
+            <section className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/70">
+              <div className="border-b border-slate-800 px-5 py-4 sm:px-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/10 text-blue-400">
+                    ⚙
+                  </div>
+
+                  <div>
+                    <h2 className="font-bold text-white">
+                      Admin Account
+                    </h2>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      Your current administrator account information.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 sm:p-6">
+                {/* Full Name */}
+                <AccountInfoItem
+                  label="Full Name"
+                  value={profile.full_name || "Not set"}
+                />
+
+                {/* Email */}
+                <AccountInfoItem
+                  label="Email Address"
+                  value={user.email || "Not available"}
+                />
+
+                {/* Role */}
+                <AccountInfoItem
+                  label="Account Role"
+                  value={profile.role}
+                  valueClassName="uppercase text-blue-400"
+                />
+
+                {/* Account Status */}
+                <AccountInfoItem
+                  label="Account Status"
+                  value="Active"
+                  valueClassName="text-emerald-400"
+                />
+              </div>
             </section>
 
             {/* Stats */}
@@ -232,7 +278,6 @@ export default async function AdminPage() {
 
             {/* Management Cards */}
             <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-
               {/* Recent Content */}
               <div className="rounded-2xl border border-slate-800 bg-slate-900/70">
                 <div className="border-b border-slate-800 px-5 py-4">
@@ -395,10 +440,33 @@ export default async function AdminPage() {
               />
             </div>
           </nav>
-
         </div>
       </div>
     </main>
+  );
+}
+
+function AccountInfoItem({
+  label,
+  value,
+  valueClassName = "text-white",
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+      <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+        {label}
+      </p>
+
+      <p
+        className={`mt-2 truncate text-sm font-semibold ${valueClassName}`}
+      >
+        {value}
+      </p>
+    </div>
   );
 }
 
