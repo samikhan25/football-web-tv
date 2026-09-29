@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
-
+import Link from "next/link";
 export default async function AdminPage() {
   const supabase = await createSupabaseServerClient();
 
@@ -50,19 +50,19 @@ export default async function AdminPage() {
               />
             </a>
 
-            <a href="/admin/videos">
-              <SidebarItem
-                icon="▶"
-                label="Video Library"
-              />
-            </a>
+            <Link href="/admin/videos">
+  <SidebarItem
+    icon="▶"
+    label="Video Library"
+  />
+</Link>
 
-            <a href="/admin/playlists">
-              <SidebarItem
-                icon="☷"
-                label="Playlists"
-              />
-            </a>
+            <Link href="/admin/playlists">
+  <SidebarItem
+    icon="☷"
+    label="Playlists"
+  />
+</Link>
 
             <a href="/admin/schedule">
               <SidebarItem
@@ -158,202 +158,140 @@ export default async function AdminPage() {
             </section>
 
             {/* Admin Account Information */}
-            <section className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/70">
-              <div className="border-b border-slate-800 px-5 py-4 sm:px-6">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/10 text-blue-400">
-                    ⚙
+<section className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/70">
+  <div className="border-b border-slate-800 px-5 py-4 sm:px-6">
+    <div className="flex items-center gap-3">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/10 text-blue-400">
+        ⚙
+      </div>
+
+      <div>
+        <h2 className="font-bold text-white">
+          Admin Account
+        </h2>
+
+        <p className="mt-1 text-xs text-slate-500">
+          Your current administrator account information.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 sm:p-6">
+    {/* Full Name */}
+    <AccountInfoItem
+      label="Full Name"
+      value={profile.full_name || "Not set"}
+    />
+
+    {/* Email */}
+    <AccountInfoItem
+      label="Email Address"
+      value={user.email || "Not available"}
+    />
+
+    {/* Role */}
+    <AccountInfoItem
+      label="Account Role"
+      value={profile.role}
+      valueClassName="uppercase text-blue-400"
+    />
+
+    {/* Account Status */}
+    <AccountInfoItem
+      label="Account Status"
+      value="Active"
+      valueClassName="text-emerald-400"
+    />
+  </div>
+
+  <div className="border-t border-slate-800 px-5 py-4 sm:px-6">
+    <Link
+      href="/admin/profile"
+      className="inline-flex rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500"
+    >
+      Edit Profile
+    </Link>
+  </div>
+</section>
+                             {/* Content Overview */}
+              <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {/* Recent Content */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/70">
+                  <div className="border-b border-slate-800 px-5 py-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h2 className="font-bold text-white">
+                          Recent Content
+                        </h2>
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          Your latest uploaded videos.
+                        </p>
+                      </div>
+
+                      <Link
+                        href="/admin/videos"
+                        className="text-xs font-semibold text-blue-400 transition hover:text-blue-300"
+                      >
+                        View All
+                      </Link>
+                    </div>
                   </div>
 
-                  <div>
-                    <h2 className="font-bold text-white">
-                      Admin Account
-                    </h2>
+                  <div className="px-5 py-12 text-center">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-xl">
+                      ▶
+                    </div>
+
+                    <p className="mt-4 text-sm font-semibold text-slate-300">
+                      No recent content
+                    </p>
 
                     <p className="mt-1 text-xs text-slate-500">
-                      Your current administrator account information.
+                      Your latest videos will appear here.
                     </p>
                   </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 sm:p-6">
-                {/* Full Name */}
-                <AccountInfoItem
-                  label="Full Name"
-                  value={profile.full_name || "Not set"}
-                />
+                {/* Live Streams */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/70">
+                  <div className="border-b border-slate-800 px-5 py-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h2 className="font-bold text-white">
+                          Live Streams
+                        </h2>
 
-                {/* Email */}
-                <AccountInfoItem
-                  label="Email Address"
-                  value={user.email || "Not available"}
-                />
+                        <p className="mt-1 text-xs text-slate-500">
+                          Current and upcoming live games.
+                        </p>
+                      </div>
 
-                {/* Role */}
-                <AccountInfoItem
-                  label="Account Role"
-                  value={profile.role}
-                  valueClassName="uppercase text-blue-400"
-                />
+                      <Link
+                        href="/admin/livestreams"
+                        className="text-xs font-semibold text-blue-400 transition hover:text-blue-300"
+                      >
+                        View All
+                      </Link>
+                    </div>
+                  </div>
 
-                {/* Account Status */}
-                <AccountInfoItem
-                  label="Account Status"
-                  value="Active"
-                  valueClassName="text-emerald-400"
-                />
-              </div>
-            </section>
-
-            {/* Stats */}
-            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <StatCard
-                label="Total Videos"
-                value="0"
-                icon="▶"
-              />
-
-              <StatCard
-                label="Live Streams"
-                value="0"
-                icon="●"
-              />
-
-              <StatCard
-                label="Scheduled Items"
-                value="0"
-                icon="◷"
-              />
-
-              <StatCard
-                label="Total Views"
-                value="0"
-                icon="↗"
-              />
-            </section>
-
-            {/* Quick Actions */}
-            <section className="mt-6">
-              <div className="mb-4">
-                <h2 className="text-lg font-bold text-white">
-                  Quick Actions
-                </h2>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Quickly access common content management tasks.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <QuickAction
-                  href="/admin/videos/new"
-                  icon="▶"
-                  title="Add Video"
-                  description="Add a new video to your library."
-                />
-
-                <QuickAction
-                  href="/admin/playlists/new"
-                  icon="☷"
-                  title="Create Playlist"
-                  description="Create and organize a playlist."
-                />
-
-                <QuickAction
-                  href="/admin/schedule/new"
-                  icon="◷"
-                  title="Add Schedule"
-                  description="Schedule content for a channel."
-                />
-
-                <QuickAction
-                  href="/admin/livestreams/new"
-                  icon="●"
-                  title="Add Livestream"
-                  description="Add a live game or stream."
-                />
-              </div>
-            </section>
-
-            {/* Management Cards */}
-            <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-              {/* Recent Content */}
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70">
-                <div className="border-b border-slate-800 px-5 py-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <h2 className="font-bold text-white">
-                        Recent Content
-                      </h2>
-
-                      <p className="mt-1 text-xs text-slate-500">
-                        Latest videos and content.
-                      </p>
+                  <div className="px-5 py-12 text-center">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-xl">
+                      ●
                     </div>
 
-                    <a
-                      href="/admin/videos"
-                      className="text-xs font-semibold text-blue-400 transition hover:text-blue-300"
-                    >
-                      View All
-                    </a>
+                    <p className="mt-4 text-sm font-semibold text-slate-300">
+                      No active livestreams
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      Active livestreams will appear here.
+                    </p>
                   </div>
                 </div>
-
-                <div className="px-5 py-12 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-xl">
-                    ▶
-                  </div>
-
-                  <p className="mt-4 text-sm font-semibold text-slate-300">
-                    No recent content
-                  </p>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    Your latest videos will appear here.
-                  </p>
-                </div>
-              </div>
-
-              {/* Live Streams */}
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70">
-                <div className="border-b border-slate-800 px-5 py-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <h2 className="font-bold text-white">
-                        Live Streams
-                      </h2>
-
-                      <p className="mt-1 text-xs text-slate-500">
-                        Current and upcoming live games.
-                      </p>
-                    </div>
-
-                    <a
-                      href="/admin/livestreams"
-                      className="text-xs font-semibold text-blue-400 transition hover:text-blue-300"
-                    >
-                      View All
-                    </a>
-                  </div>
-                </div>
-
-                <div className="px-5 py-12 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-xl">
-                    ●
-                  </div>
-
-                  <p className="mt-4 text-sm font-semibold text-slate-300">
-                    No active livestreams
-                  </p>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    Active livestreams will appear here.
-                  </p>
-                </div>
-              </div>
-            </section>
+              </section>
 
             {/* Management */}
             <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/70">
