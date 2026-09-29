@@ -99,4 +99,19 @@ export async function updateChannel(
   }
 
   redirect("/admin/channels");
+}export async function deleteChannel(channelId: string) {
+  const supabase = await checkAdmin();
+
+  const { error } = await supabase
+    .from("channels")
+    .delete()
+    .eq("id", channelId);
+
+  if (error) {
+    redirect(
+      `/admin/channels?error=${encodeURIComponent(error.message)}`
+    );
+  }
+
+  redirect("/admin/channels");
 }

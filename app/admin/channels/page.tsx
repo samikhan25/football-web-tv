@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Channel } from "@/types/database";
-
+import { deleteChannel } from "./[id]/edit/actions";
 export default async function ChannelsPage() {
   const supabase = await createSupabaseServerClient();
 
@@ -221,6 +221,14 @@ export default async function ChannelsPage() {
                           >
                             Edit
                           </Link>
+                          <form action={deleteChannel.bind(null, channel.id)}>
+  <button
+    type="submit"
+    className="inline-flex items-center justify-center rounded-lg border border-red-900/70 px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-950/40 hover:text-red-300"
+  >
+    Delete
+  </button>
+</form>
                         </div>
                       </td>
                     </tr>
@@ -272,12 +280,23 @@ export default async function ChannelsPage() {
                     Created: {formatDate(channel.created_at)}
                   </p>
 
-                  <Link
-                    href={`/admin/channels/${channel.id}/edit`}
-                    className="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
-                  >
-                    Edit Channel
-                  </Link>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+  <Link
+    href={`/admin/channels/${channel.id}/edit`}
+    className="inline-flex w-full items-center justify-center rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
+  >
+    Edit Channel
+  </Link>
+
+  <form action={deleteChannel.bind(null, channel.id)}>
+    <button
+      type="submit"
+      className="inline-flex w-full items-center justify-center rounded-xl border border-red-900/70 px-4 py-2.5 text-sm font-semibold text-red-400 transition hover:bg-red-950/40 hover:text-red-300"
+    >
+      Delete
+    </button>
+  </form>
+</div>
                 </div>
               </article>
             ))}
