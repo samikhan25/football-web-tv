@@ -1,35 +1,57 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export default function LoginPage() {
+  const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
+    console.log("LOGIN BUTTON PRESSED");
+
     setLoading(true);
-    setMessage("");
+    setMessage("Logging in...");
 
-    const supabase = createSupabaseBrowserClient();
+    try {
+      const supabase = createSupabaseBrowserClient();
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+      console.log("SUPABASE CLIENT CREATED");
 
-    setLoading(false);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-    if (error) {
-      setMessage(error.message);
-      return;
+      console.log("LOGIN RESPONSE:", error);
+
+      if (error) {
+        setLoading(false);
+        setMessage(error.message);
+        return;
+      }
+
+      setMessage("Login successful!");
+
+      router.push("/admin");
+      router.refresh();
+    } catch (error) {
+      console.error("LOGIN ERROR:", error);
+
+      setLoading(false);
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong during login."
+      );
     }
-
-    setMessage("Login successful!");
   }
 
   return (
@@ -74,7 +96,16 @@ export default function LoginPage() {
           {loading ? "Logging in..." : "Login"}
         </button>
 
-        {message && <p>{message}</p>}
+        {message && (
+          <p
+            style={{
+              margin: 0,
+              wordBreak: "break-word",
+            }}
+          >
+            {message}
+          </p>
+        )}
       </form>
     </main>
   );

@@ -14,14 +14,13 @@ export async function POST() {
           message: "Logout failed.",
           error: error.message,
         },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "Logout successful.",
-    });
+    return NextResponse.redirect(
+      new URL("/login", process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
+    );
   } catch (error) {
     return NextResponse.json(
       {
@@ -29,7 +28,7 @@ export async function POST() {
         message: "Logout failed.",
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

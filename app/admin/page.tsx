@@ -96,21 +96,37 @@ export default async function AdminPage() {
             />
           </nav>
 
-          <div className="border-t border-slate-800 p-4">
-            <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
-              <p className="truncate text-sm font-semibold text-white">
-                {profile.full_name || "Admin"}
-              </p>
+         <div className="border-t border-slate-800 p-4">
+  <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
+    <p className="truncate text-sm font-semibold text-white">
+      {profile.full_name || "Admin"}
+    </p>
 
-              <p className="mt-1 truncate text-xs text-slate-500">
-                {user.email}
-              </p>
+    <p className="mt-1 truncate text-xs text-slate-500">
+      {user.email}
+    </p>
 
-              <p className="mt-2 text-xs font-medium uppercase tracking-wider text-blue-400">
-                {profile.role}
-              </p>
-            </div>
-          </div>
+    <p className="mt-2 text-xs font-medium uppercase tracking-wider text-blue-400">
+      {profile.role}
+    </p>
+
+    <a
+      href="/admin/profile"
+      className="mt-3 block rounded-lg border border-slate-700 px-3 py-2 text-center text-xs font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
+    >
+      Account Settings
+    </a>
+
+    <form action="/api/auth/logout" method="POST">
+  <button
+    type="submit"
+    className="mt-2 w-full rounded-lg border border-red-900/50 px-3 py-2 text-center text-xs font-semibold text-red-400 transition hover:bg-red-950/40 hover:text-red-300"
+  >
+    Logout
+  </button>
+</form>
+  </div>
+</div>
         </aside>
 
         {/* Main Content */}
