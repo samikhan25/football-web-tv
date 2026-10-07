@@ -16,7 +16,7 @@ export type PlaybackVideo = {
   duration_seconds: number | null;
 };
 
- export type TVLiveStream = {
+export type TVLiveStream = {
   id: string;
   title: string;
   stream_url: string;
@@ -36,6 +36,7 @@ type PlaybackEngineProps = {
   videos: PlaybackVideo[];
   liveStreams: TVLiveStream[];
   schedule: TVScheduleItem[];
+  embedMode?: boolean;
 };
 
 const NEXT_VIDEO_DELAY = 800;
@@ -82,6 +83,7 @@ export default function PlaybackEngine({
   videos,
   liveStreams,
   schedule,
+  embedMode = false,
 }: PlaybackEngineProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -94,6 +96,10 @@ export default function PlaybackEngine({
   const errorTimerRef = useRef<number | null>(null);
   const stallTimerRef = useRef<number | null>(null);
   const nextTimerRef = useRef<number | null>(null);
+
+  const trackedVideoIdRef = useRef<string | null>(null);
+  const trackedLiveStreamIdRef =
+    useRef<string | null>(null);
 
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -116,6 +122,62 @@ export default function PlaybackEngine({
     useState(false);
 
   const currentVideo = videos[currentIndex] ?? null;
+
+  const trackVideoView = useCallback(
+    async (videoId: string) => {
+      if (trackedVideoIdRef.current === videoId) {
+        return;
+      }
+
+      trackedVideoIdRef.current = videoId;
+
+      try {
+        await fetch("/api/analytics", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            video_id: videoId,
+            event_type: "video_view",
+            session_type: "tv",
+          }),
+        });
+      } catch {
+        // Analytics failure must never interrupt playback.
+      }
+    },
+    [],
+  );
+
+  const trackLiveView = useCallback(
+    async (livestreamId: string) => {
+      if (
+        trackedLiveStreamIdRef.current === livestreamId
+      ) {
+        return;
+      }
+
+      trackedLiveStreamIdRef.current = livestreamId;
+
+      try {
+        await fetch("/api/analytics", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            livestream_id: livestreamId,
+            event_type: "live_view",
+            session_type: "live",
+          }),
+        });
+      } catch {
+        // Analytics failure must never interrupt playback.
+      }
+    },
+    [],
+  );
 
   const clearAllTimers = useCallback(() => {
     clearTimer(errorTimerRef);
@@ -256,18 +318,6 @@ export default function PlaybackEngine({
   }, [clearAllTimers, destroyHls]);
 
   useEffect(() => {
-    if (isLiveMode || !currentVideo) {
-      return;
-    }
-
-    resetPlaybackState();
-  }, [
-    currentVideo?.id,
-    isLiveMode,
-    resetPlaybackState,
-  ]);
-
-  useEffect(() => {
     const videoElement = videoRef.current;
 
     if (!videoElement) {
@@ -289,8 +339,6 @@ export default function PlaybackEngine({
       : currentVideo?.video_url;
 
     if (!source) {
-      setIsLoading(false);
-      setHasError(true);
       return;
     }
 
@@ -303,7 +351,10 @@ export default function PlaybackEngine({
         videoElement.removeAttribute("src");
         videoElement.load();
 
-        if (isLiveMode && source.includes(".m3u8")) {
+        if (
+          isLiveMode &&
+          source.includes(".m3u8")
+        ) {
           if (
             videoElement.canPlayType(
               "application/vnd.apple.mpegurl",
@@ -551,40 +602,63 @@ export default function PlaybackEngine({
     duration > 0
       ? Math.min(
           100,
-          Math.max(0, (currentTime / duration) * 100),
+          Math.max(
+            0,
+            (currentTime / duration) * 100,
+          ),
         )
       : 0;
 
   return (
-    <main className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-        <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="h-3 w-3 rounded-full bg-red-500" />
+    <main
+      className={
+        embedMode
+          ? "min-h-0 w-full bg-black text-white"
+          : "min-h-screen bg-black text-white"
+      }
+    >
+      <div
+        className={
+          embedMode
+            ? "w-full"
+            : "mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8"
+        }
+      >
+        {!embedMode && (
+          <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="h-3 w-3 rounded-full bg-red-500" />
 
-              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-                Football TV
-              </h1>
+                <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+                  Football TV
+                </h1>
+              </div>
+
+              <p className="mt-1 text-sm text-white/50">
+                24/7 Football Academy TV
+              </p>
             </div>
 
-            <p className="mt-1 text-sm text-white/50">
-              24/7 Football Academy TV
-            </p>
-          </div>
+            {isLiveMode && (
+              <button
+                type="button"
+                onClick={returnToTV}
+                className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+              >
+                Back to 24/7 TV
+              </button>
+            )}
+          </header>
+        )}
 
-          {isLiveMode && (
-            <button
-              type="button"
-              onClick={returnToTV}
-              className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-            >
-              Back to 24/7 TV
-            </button>
-          )}
-        </header>
-
-        <section className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl">
+        <section
+          className={
+            embedMode
+              ? "w-full overflow-hidden bg-black"
+              : "overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl"
+          }
+        >
           <div className="relative aspect-video w-full bg-black">
             <video
               ref={videoRef}
@@ -645,6 +719,19 @@ export default function PlaybackEngine({
               onPlay={() => {
                 setIsPlaying(true);
                 setAutoplayBlocked(false);
+
+                if (!isLiveMode && currentVideo) {
+                  void trackVideoView(currentVideo.id);
+                }
+
+                if (
+                  isLiveMode &&
+                  selectedLiveStream
+                ) {
+                  void trackLiveView(
+                    selectedLiveStream.id,
+                  );
+                }
               }}
               onPause={() => {
                 if (!isLiveMode) {
@@ -660,6 +747,19 @@ export default function PlaybackEngine({
                 setHasError(false);
                 setAutoplayBlocked(false);
                 setIsPlaying(true);
+
+                if (!isLiveMode && currentVideo) {
+                  void trackVideoView(currentVideo.id);
+                }
+
+                if (
+                  isLiveMode &&
+                  selectedLiveStream
+                ) {
+                  void trackLiveView(
+                    selectedLiveStream.id,
+                  );
+                }
               }}
               onCanPlay={() => {
                 if (isLiveMode) {
@@ -971,7 +1071,9 @@ export default function PlaybackEngine({
                       media.muted = !media.muted;
                     }
 
-                    setIsMuted((previous) => !previous);
+                    setIsMuted(
+                      (previous) => !previous,
+                    );
                   }}
                   className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 text-sm text-white transition hover:bg-white/10"
                 >
@@ -1029,28 +1131,36 @@ export default function PlaybackEngine({
           </div>
         </section>
 
-        <section className="mt-6">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
-              {isLiveMode ? "Live Now" : "Now Playing"}
-            </p>
+        {embedMode && isLiveMode && (
+          <div className="flex items-center justify-between gap-4 border-b border-white/10 bg-zinc-950 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-red-400">
+                Live Now
+              </p>
 
-            <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-              <h2 className="text-xl font-semibold">
+              <p className="mt-1 truncate text-sm font-medium text-white">
                 {currentTitle}
-              </h2>
-
-              {!isLiveMode && videos.length > 0 && (
-                <p className="text-sm text-white/40">
-                  {currentIndex + 1} / {videos.length}
-                </p>
-              )}
+              </p>
             </div>
+
+            <button
+              type="button"
+              onClick={returnToTV}
+              className="shrink-0 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/10"
+            >
+              Back to 24/7 TV
+            </button>
           </div>
-        </section>
+        )}
 
         {liveStreams.length > 0 && (
-          <section className="mt-6">
+          <section
+            className={
+              embedMode
+                ? "bg-black px-4 py-5 sm:px-6"
+                : "mt-6"
+            }
+          >
             <div className="mb-3 flex items-end justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-red-400">
@@ -1063,7 +1173,11 @@ export default function PlaybackEngine({
               </div>
 
               <span className="text-xs text-white/40">
-                {Math.min(liveStreams.length, 3)} live
+                {Math.min(
+                  liveStreams.length,
+                  3,
+                )}{" "}
+                live
               </span>
             </div>
 
@@ -1072,7 +1186,8 @@ export default function PlaybackEngine({
                 .slice(0, 3)
                 .map((stream) => {
                   const isSelected =
-                    selectedLiveStream?.id === stream.id &&
+                    selectedLiveStream?.id ===
+                      stream.id &&
                     isLiveMode;
 
                   return (
@@ -1125,118 +1240,154 @@ export default function PlaybackEngine({
           </section>
         )}
 
-        {!isLiveMode && videos.length > 1 && (
-          <section className="mt-6">
-            <div className="mb-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
-                Up Next
-              </p>
+        {!embedMode && (
+          <>
+            <section className="mt-6">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
+                  {isLiveMode
+                    ? "Live Now"
+                    : "Now Playing"}
+                </p>
 
-              <h2 className="mt-1 text-xl font-semibold">
-                Coming Up
-              </h2>
-            </div>
+                <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <h2 className="text-xl font-semibold">
+                    {currentTitle}
+                  </h2>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {videos
-                .map((video, index) => ({
-                  video,
-                  index,
-                }))
-                .filter(
-                  ({ index }) =>
-                    index !== currentIndex,
-                )
-                .slice(0, 3)
-                .map(({ video, index }) => (
-                  <button
-                    key={video.id}
-                    type="button"
-                    onClick={() => {
-                      clearAllTimers();
-                      setCurrentIndex(index);
-                    }}
-                    className="flex overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] text-left transition hover:border-white/20 hover:bg-white/[0.06]"
-                  >
-                    <div className="h-20 w-32 shrink-0 bg-zinc-900">
-                      {video.thumbnail_url ? (
-                        <img
-                          src={video.thumbnail_url}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-xl">
-                          ⚽
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="min-w-0 p-3">
-                      <p className="truncate text-sm font-medium">
-                        {video.title}
+                  {!isLiveMode &&
+                    videos.length > 0 && (
+                      <p className="text-sm text-white/40">
+                        {currentIndex + 1} /{" "}
+                        {videos.length}
                       </p>
-
-                      {video.duration_seconds !==
-                        null && (
-                        <p className="mt-1 text-xs text-white/40">
-                          {formatTime(
-                            video.duration_seconds,
-                          )}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                ))}
-            </div>
-          </section>
-        )}
-
-        {schedule.length > 0 && (
-          <section className="mt-6 pb-8">
-            <div className="mb-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
-                Schedule
-              </p>
-
-              <h2 className="mt-1 text-xl font-semibold">
-                Upcoming
-              </h2>
-            </div>
-
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-              {schedule.map((item, index) => (
-                <div
-                  key={item.id}
-                  className={`flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between ${
-                    index !== schedule.length - 1
-                      ? "border-b border-white/10"
-                      : ""
-                  }`}
-                >
-                  <div>
-                    <p className="font-medium">
-                      {item.playlist_name}
-                    </p>
-
-                    <p className="mt-1 text-xs text-white/40">
-                      Scheduled program
-                    </p>
-                  </div>
-
-                  <div className="text-sm text-white/60">
-                    {formatScheduleTime(
-                      item.start_time,
-                    )}{" "}
-                    –{" "}
-                    {formatScheduleTime(
-                      item.end_time,
                     )}
-                  </div>
                 </div>
-              ))}
-            </div>
-          </section>
+              </div>
+            </section>
+
+            {!isLiveMode &&
+              videos.length > 1 && (
+                <section className="mt-6">
+                  <div className="mb-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
+                      Up Next
+                    </p>
+
+                    <h2 className="mt-1 text-xl font-semibold">
+                      Coming Up
+                    </h2>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {videos
+                      .map((video, index) => ({
+                        video,
+                        index,
+                      }))
+                      .filter(
+                        ({ index }) =>
+                          index !== currentIndex,
+                      )
+                      .slice(0, 3)
+                      .map(
+                        ({ video, index }) => (
+                          <button
+                            key={video.id}
+                            type="button"
+                            onClick={() => {
+                              clearAllTimers();
+                              setCurrentIndex(index);
+                            }}
+                            className="flex overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] text-left transition hover:border-white/20 hover:bg-white/[0.06]"
+                          >
+                            <div className="h-20 w-32 shrink-0 bg-zinc-900">
+                              {video.thumbnail_url ? (
+                                <img
+                                  src={
+                                    video.thumbnail_url
+                                  }
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full items-center justify-center text-xl">
+                                  ⚽
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="min-w-0 p-3">
+                              <p className="truncate text-sm font-medium">
+                                {video.title}
+                              </p>
+
+                              {video.duration_seconds !==
+                                null && (
+                                <p className="mt-1 text-xs text-white/40">
+                                  {formatTime(
+                                    video.duration_seconds,
+                                  )}
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                        ),
+                      )}
+                  </div>
+                </section>
+              )}
+
+            {schedule.length > 0 && (
+              <section className="mt-6 pb-8">
+                <div className="mb-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
+                    Schedule
+                  </p>
+
+                  <h2 className="mt-1 text-xl font-semibold">
+                    Upcoming
+                  </h2>
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+                  {schedule.map(
+                    (item, index) => (
+                      <div
+                        key={item.id}
+                        className={`flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between ${
+                          index !==
+                          schedule.length - 1
+                            ? "border-b border-white/10"
+                            : ""
+                        }`}
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {item.playlist_name}
+                          </p>
+
+                          <p className="mt-1 text-xs text-white/40">
+                            Scheduled program
+                          </p>
+                        </div>
+
+                        <div className="text-sm text-white/60">
+                          {formatScheduleTime(
+                            item.start_time,
+                          )}{" "}
+                          –{" "}
+                          {formatScheduleTime(
+                            item.end_time,
+                          )}
+                        </div>
+                      </div>
+                    ),
+                  )}
+                </div>
+              </section>
+            )}
+          </>
         )}
       </div>
     </main>

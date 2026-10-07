@@ -85,11 +85,12 @@ export default async function AdminPage() {
               />
             </a>
 
-            <SidebarItem
-              icon="↗"
-              label="Analytics"
-            />
-
+           <a href="/admin/analytics">
+  <SidebarItem
+    icon="↗"
+    label="Analytics"
+  />
+</a>
             <SidebarItem
               icon="⚙"
               label="Settings"

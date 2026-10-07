@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 async function checkAdmin() {
@@ -14,13 +15,13 @@ async function checkAdmin() {
     redirect("/login");
   }
 
-  const { data: profile, error } = await supabase
+  const { data: profile } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
     .single();
 
-  if (error || !profile || profile.role !== "admin") {
+  if (profile?.role !== "admin") {
     redirect("/");
   }
 
@@ -30,32 +31,62 @@ async function checkAdmin() {
 export async function createSchedule(formData: FormData) {
   const supabase = await checkAdmin();
 
-  const title = String(formData.get("title") || "").trim();
-  const description = String(formData.get("description") || "").trim();
+  const playlistId = String(formData.get("playlist_id") || "").trim();
   const channelId = String(formData.get("channel_id") || "").trim();
-  const videoId = String(formData.get("video_id") || "").trim();
+  const description = String(formData.get("description") || "").trim();
   const startTime = String(formData.get("start_time") || "").trim();
   const endTime = String(formData.get("end_time") || "").trim();
+  const isActive = formData.get("is_active") === "true";
 
-  if (!title || !channelId || !startTime) {
+  if (!playlistId || !channelId || !startTime) {
     redirect(
-      "/admin/schedule/new?error=Title%2C%20channel%2C%20and%20start%20time%20are%20required"
+      "/admin/schedule/new?error=Playlist%2C%20channel%20and%20start%20time%20are%20required."
     );
   }
 
-  if (endTime && new Date(endTime) <= new Date(startTime)) {
+  const startDate = new Date(startTime);
+
+  if (Number.isNaN(startDate.getTime())) {
     redirect(
-      "/admin/schedule/new?error=End%20time%20must%20be%20after%20start%20time"
+      "/admin/schedule/new?error=Invalid%20start%20time."
+    );
+  }
+
+  let endDate: Date | null = null;
+
+  if (endTime) {
+    endDate = new Date(endTime);
+
+    if (
+      Number.isNaN(endDate.getTime()) ||
+      endDate <= startDate
+    ) {
+      redirect(
+        "/admin/schedule/new?error=End%20time%20must%20be%20later%20than%20start%20time."
+      );
+    }
+  }
+
+  const { data: playlist, error: playlistError } = await supabase
+    .from("playlists")
+    .select("id, name")
+    .eq("id", playlistId)
+    .single();
+
+  if (playlistError || !playlist) {
+    redirect(
+      "/admin/schedule/new?error=Selected%20playlist%20was%20not%20found."
     );
   }
 
   const { error } = await supabase.from("schedules").insert({
-    title,
-    description: description || null,
     channel_id: channelId,
-    video_id: videoId || null,
-    start_time: new Date(startTime).toISOString(),
-    end_time: endTime ? new Date(endTime).toISOString() : null,
+    playlist_id: playlistId,
+    title: playlist.name,
+    description: description || null,
+    start_time: startDate.toISOString(),
+    end_time: endDate ? endDate.toISOString() : null,
+    is_active: isActive,
   });
 
   if (error) {

@@ -1,36 +1,42 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+
 import { createSupabaseServerClient } from "@/lib/supabase-server";
-import { deleteSchedule } from "./[id]/edit/actions";
+import { deleteSchedule } from "./actions";
+
 interface ScheduleItem {
   id: string;
   channel_id: string;
-  video_id: string | null;
+  playlist_id: string | null;
   title: string;
   description: string | null;
   start_time: string;
   end_time: string | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
-  channels:
-  | {
-      id: string;
-      name: string;
-    }[]
-  | null;
-
-videos:
-  | {
-      id: string;
-      title: string;
-    }[]
-  | null;
+  channels: {
+    id: string;
+    name: string;
+  }[] | null;
+  playlists: {
+    id: string;
+    name: string;
+  }[] | null;
 }
 
-export default async function SchedulePage() {
+function formatDateTime(value: string | null) {
+  if (!value) return "—";
+
+  return new Date(value).toLocaleString([], {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+export default async function AdminSchedulePage() {
   const supabase = await createSupabaseServerClient();
 
-  // Check logged-in user
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -39,308 +45,176 @@ export default async function SchedulePage() {
     redirect("/login");
   }
 
-  // Check admin role
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, role")
+    .select("role")
     .eq("id", user.id)
     .single();
 
-  if (profileError || !profile || profile.role !== "admin") {
+  if (profile?.role !== "admin") {
     redirect("/");
   }
 
-  // Get schedules
-  const { data: schedules, error: schedulesError } = await supabase
+  const { data: schedules, error } = await supabase
     .from("schedules")
     .select(`
       id,
       channel_id,
-      video_id,
+      playlist_id,
       title,
       description,
       start_time,
       end_time,
+      is_active,
       created_at,
       updated_at,
       channels (
         id,
         name
       ),
-      videos (
+      playlists (
         id,
-        title
+        name
       )
     `)
     .order("start_time", { ascending: true });
 
+  if (error) {
+    return (
+      <main className="p-6">
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-400">
+          Failed to load schedules: {error.message}
+        </div>
+      </main>
+    );
+  }
+
   const scheduleList = (schedules ?? []) as ScheduleItem[];
 
   return (
-    <main className="min-h-screen bg-[#0b1020] text-white">
-      <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8">
-
-        {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-blue-400">
-              Content Management
-            </p>
-
-            <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-              Schedule
-            </h1>
-
-            <p className="mt-1 text-sm text-slate-400">
-              Manage scheduled academy video content.
-            </p>
-          </div>
-
-          <Link
-            href="/admin"
-            className="inline-flex w-fit items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
-          >
-            ← Dashboard
-          </Link>
+    <main className="space-y-6 p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">Schedule</h1>
+          <p className="mt-1 text-sm text-gray-400">
+            Manage playlists and their broadcast times.
+          </p>
         </div>
 
-        {/* Top controls */}
-        <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm text-slate-400">
-              Scheduled Items
-            </p>
+        <Link
+          href="/admin/schedule/new"
+          className="inline-flex items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-gray-200"
+        >
+          Add Schedule
+        </Link>
+      </div>
 
-            <p className="mt-1 text-2xl font-bold">
-              {scheduleList.length}
-            </p>
-          </div>
-
-          <Link
-            href="/admin/schedule/new"
-            className="inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 sm:w-auto"
-          >
-            + Add Schedule
-          </Link>
+      {scheduleList.length === 0 ? (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-8 text-center">
+          <h2 className="text-lg font-medium text-white">
+            No schedules yet
+          </h2>
+          <p className="mt-2 text-sm text-gray-400">
+            Create your first schedule to start organizing the TV playlist.
+          </p>
         </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="border-b border-white/10 bg-white/[0.03]">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium text-gray-400">
+                    Playlist
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-400">
+                    Channel
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-400">
+                    Start
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-400">
+                    End
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-400">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-400">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
 
-        {/* Error */}
-        {schedulesError && (
-          <div className="mb-6 rounded-2xl border border-red-900/60 bg-red-950/40 p-4">
-            <p className="text-sm font-semibold text-red-400">
-              Unable to load schedule
-            </p>
+              <tbody className="divide-y divide-white/10">
+                {scheduleList.map((schedule) => {
+                  const playlist = schedule.playlists?.[0];
+                  const channel = schedule.channels?.[0];
 
-            <p className="mt-1 text-sm text-red-300/80">
-              {schedulesError.message}
-            </p>
-          </div>
-        )}
+                  return (
+                    <tr key={schedule.id} className="hover:bg-white/[0.02]">
+                      <td className="px-4 py-4">
+                        <div className="font-medium text-white">
+                          {playlist?.name || schedule.title || "Untitled"}
+                        </div>
 
-        {/* Empty state */}
-        {!schedulesError && scheduleList.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 px-6 py-16 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-800 text-2xl">
-              ◷
-            </div>
-
-            <h2 className="mt-5 text-lg font-semibold">
-              No schedules yet
-            </h2>
-
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">
-              Your schedule is currently empty. Add your first scheduled
-              video to get started.
-            </p>
-          </div>
-        )}
-
-        {/* Desktop / Tablet */}
-        {scheduleList.length > 0 && (
-          <div className="hidden overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70 md:block">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px] text-left">
-                <thead className="border-b border-slate-800 bg-slate-950/60">
-                  <tr>
-                    <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Schedule
-                    </th>
-
-                    <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Channel
-                    </th>
-
-                    <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Video
-                    </th>
-
-                    <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Start
-                    </th>
-
-                    <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      End
-                    </th>
-
-                    <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-800">
-                  {scheduleList.map((item) => (
-                    <tr
-                      key={item.id}
-                      className="transition hover:bg-slate-800/30"
-                    >
-                      <td className="px-5 py-5">
-                        <p className="font-semibold text-white">
-                          {item.title}
-                        </p>
-
-                        <p className="mt-1 max-w-xs truncate text-sm text-slate-400">
-                          {item.description || "No description"}
-                        </p>
+                        {schedule.description && (
+                          <div className="mt-1 max-w-xs truncate text-xs text-gray-500">
+                            {schedule.description}
+                          </div>
+                        )}
                       </td>
 
-                      <td className="px-5 py-5 text-sm text-slate-300">
-                       {item.channels?.[0]?.name || "No channel"}
+                      <td className="px-4 py-4 text-gray-300">
+                        {channel?.name || "—"}
                       </td>
 
-                      <td className="px-5 py-5 text-sm text-slate-300">
-                       {item.videos?.[0]?.title || "No video"}
+                      <td className="px-4 py-4 whitespace-nowrap text-gray-300">
+                        {formatDateTime(schedule.start_time)}
                       </td>
 
-                      <td className="px-5 py-5 text-sm text-slate-300">
-                        {formatDateTime(item.start_time)}
+                      <td className="px-4 py-4 whitespace-nowrap text-gray-300">
+                        {formatDateTime(schedule.end_time)}
                       </td>
 
-                      <td className="px-5 py-5 text-sm text-slate-400">
-                        {item.end_time
-                          ? formatDateTime(item.end_time)
-                          : "—"}
+                      <td className="px-4 py-4">
+                        {schedule.is_active ? (
+                          <span className="inline-flex rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-400">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex rounded-full bg-gray-500/10 px-2.5 py-1 text-xs font-medium text-gray-400">
+                            Inactive
+                          </span>
+                        )}
                       </td>
 
-                      <td className="px-5 py-5">
-                        <div className="flex justify-end gap-2">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center justify-end gap-2">
                           <Link
-                            href={`/admin/schedule/${item.id}/edit`}
-                            className="inline-flex items-center justify-center rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
+                            href={`/admin/schedule/${schedule.id}/edit`}
+                            className="rounded-md border border-white/10 px-3 py-1.5 text-xs text-gray-300 transition hover:bg-white/10 hover:text-white"
                           >
                             Edit
                           </Link>
-<form action={deleteSchedule.bind(null, item.id)}>
-  <button
-    type="submit"
-    className="inline-flex items-center justify-center rounded-lg border border-red-900/70 px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-950/40"
-  >
-    Delete
-  </button>
-</form>
+
+                          <form action={deleteSchedule.bind(null, schedule.id)}>
+                            <button
+                              type="submit"
+                              className="rounded-md border border-red-500/20 px-3 py-1.5 text-xs text-red-400 transition hover:bg-red-500/10"
+                            >
+                              Delete
+                            </button>
+                          </form>
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
-
-        {/* Mobile */}
-        {scheduleList.length > 0 && (
-          <div className="space-y-4 md:hidden">
-            {scheduleList.map((item) => (
-              <article
-                key={item.id}
-                className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h2 className="font-semibold leading-6 text-white">
-                      {item.title}
-                    </h2>
-
-                    <p className="mt-1 text-sm text-slate-400">
-                      {item.description || "No description"}
-                    </p>
-                  </div>
-
-                  <span className="shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400">
-                    Scheduled
-                  </span>
-                </div>
-
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl bg-slate-950/60 p-3">
-                    <p className="text-xs text-slate-500">
-                      Channel
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-slate-200">
-                      {item.channels?.[0]?.name || "No channel"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl bg-slate-950/60 p-3">
-                    <p className="text-xs text-slate-500">
-                      Video
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-slate-200">
-                     {item.videos?.[0]?.title || "No video"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl bg-slate-950/60 p-3">
-                    <p className="text-xs text-slate-500">
-                      Start
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-slate-200">
-                      {formatDateTime(item.start_time)}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl bg-slate-950/60 p-3">
-                    <p className="text-xs text-slate-500">
-                      End
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-slate-200">
-                      {item.end_time
-                        ? formatDateTime(item.end_time)
-                        : "—"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <Link
-                    href={`/admin/schedule/${item.id}/edit`}
-                    className="block w-full rounded-xl border border-slate-700 px-4 py-2.5 text-center text-sm font-semibold text-slate-300 transition hover:bg-slate-800"
-                  >
-                    Edit
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </main>
   );
-}
-
-function formatDateTime(dateString: string) {
-  const date = new Date(dateString);
-
-  return date.toLocaleString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }
