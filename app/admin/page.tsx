@@ -35,14 +35,6 @@ export default async function AdminPage() {
     .order("created_at", { ascending: false })
     .limit(5);
 
-  // Get active/upcoming livestreams
-  const { data: liveStreams } = await supabase
-    .from("livestreams")
-    .select("id, title, status, scheduled_at")
-    .in("status", ["live", "scheduled"])
-    .order("scheduled_at", { ascending: true })
-    .limit(5);
-
   return (
     <main className="min-h-screen bg-[#0b1020] text-white">
       <div className="flex min-h-screen">
@@ -178,7 +170,7 @@ export default async function AdminPage() {
             </section>
 
             {/* Content Overview */}
-            <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <section className="grid grid-cols-1 gap-6">
 
               {/* Recent Content */}
               <div className="rounded-2xl border border-slate-800 bg-slate-900/70">
@@ -263,112 +255,6 @@ export default async function AdminPage() {
 
                       <p className="mt-1 text-xs text-slate-500">
                         Your latest videos will appear here.
-                      </p>
-
-                    </div>
-                  )}
-
-                </div>
-
-              </div>
-
-              {/* Live Streams */}
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70">
-
-                <div className="border-b border-slate-800 px-5 py-4">
-                  <div className="flex items-center justify-between gap-4">
-
-                    <div>
-                      <h2 className="font-bold text-white">
-                        Live Streams
-                      </h2>
-
-                      <p className="mt-1 text-xs text-slate-500">
-                        Current and upcoming live games.
-                      </p>
-                    </div>
-
-                    <Link
-                      href="/admin/livestreams"
-                      className="text-xs font-semibold text-blue-400 transition hover:text-blue-300"
-                    >
-                      View All
-                    </Link>
-
-                  </div>
-                </div>
-
-                <div className="divide-y divide-slate-800">
-
-                  {liveStreams && liveStreams.length > 0 ? (
-                    liveStreams.map((stream) => (
-                      <Link
-                        key={stream.id}
-                        href={`/admin/livestreams/${stream.id}`}
-                        className="flex items-center gap-4 px-5 py-4 transition hover:bg-slate-800/40"
-                      >
-
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800">
-
-                          <span
-                            className={
-                              stream.status === "live"
-                                ? "text-red-400"
-                                : "text-slate-400"
-                            }
-                          >
-                            ●
-                          </span>
-
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-
-                          <p className="truncate text-sm font-semibold text-white">
-                            {stream.title}
-                          </p>
-
-                          <div className="mt-1 flex items-center gap-2">
-
-                            <span
-                              className={`text-[10px] font-bold uppercase ${
-                                stream.status === "live"
-                                  ? "text-red-400"
-                                  : "text-blue-400"
-                              }`}
-                            >
-                              {stream.status}
-                            </span>
-
-                            {stream.scheduled_at && (
-                              <span className="text-xs text-slate-500">
-                                {formatDate(stream.scheduled_at)}
-                              </span>
-                            )}
-
-                          </div>
-
-                        </div>
-
-                        <span className="text-slate-600">
-                          →
-                        </span>
-
-                      </Link>
-                    ))
-                  ) : (
-                    <div className="px-5 py-12 text-center">
-
-                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-xl">
-                        ●
-                      </div>
-
-                      <p className="mt-4 text-sm font-semibold text-slate-300">
-                        No active livestreams
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-500">
-                        Active livestreams will appear here.
                       </p>
 
                     </div>
