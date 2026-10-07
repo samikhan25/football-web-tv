@@ -36,6 +36,7 @@ type PlaybackEngineProps = {
   videos: PlaybackVideo[];
   liveStreams: TVLiveStream[];
   schedule: TVScheduleItem[];
+  playlistName?: string;
   embedMode?: boolean;
 };
 
@@ -43,9 +44,7 @@ const NEXT_VIDEO_DELAY = 800;
 const STALL_RECOVERY_DELAY = 4000;
 const ERROR_RECOVERY_DELAY = 5000;
 
-function clearTimer(
-  timerRef: MutableRefObject<number | null>,
-) {
+function clearTimer(timerRef: MutableRefObject<number | null>) {
   if (timerRef.current !== null) {
     window.clearTimeout(timerRef.current);
     timerRef.current = null;
@@ -83,6 +82,7 @@ export default function PlaybackEngine({
   videos,
   liveStreams,
   schedule,
+  playlistName = "Football TV",
   embedMode = false,
 }: PlaybackEngineProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -98,16 +98,13 @@ export default function PlaybackEngine({
   const nextTimerRef = useRef<number | null>(null);
 
   const trackedVideoIdRef = useRef<string | null>(null);
-  const trackedLiveStreamIdRef =
-    useRef<string | null>(null);
+  const trackedLiveStreamIdRef = useRef<string | null>(null);
 
   const [currentIndex, setCurrentIndex] = useState(0);
-
   const [selectedLiveStream, setSelectedLiveStream] =
     useState<TVLiveStream | null>(null);
 
   const [isLiveMode, setIsLiveMode] = useState(false);
-
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -118,66 +115,62 @@ export default function PlaybackEngine({
   const [isLoading, setIsLoading] = useState(true);
   const [isStalled, setIsStalled] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [autoplayBlocked, setAutoplayBlocked] =
-    useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
 
   const currentVideo = videos[currentIndex] ?? null;
 
-  const trackVideoView = useCallback(
-    async (videoId: string) => {
-      if (trackedVideoIdRef.current === videoId) {
-        return;
-      }
+  const currentTitle = isLiveMode
+    ? selectedLiveStream?.title ?? "Live Game"
+    : currentVideo?.title ?? playlistName;
 
-      trackedVideoIdRef.current = videoId;
+  const progressValue =
+    duration > 0
+      ? Math.min(100, Math.max(0, (currentTime / duration) * 100))
+      : 0;
 
-      try {
-        await fetch("/api/analytics", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            video_id: videoId,
-            event_type: "video_view",
-            session_type: "tv",
-          }),
-        });
-      } catch {
-        // Analytics failure must never interrupt playback.
-      }
-    },
-    [],
-  );
+  const trackVideoView = useCallback(async (videoId: string) => {
+    if (trackedVideoIdRef.current === videoId) {
+      return;
+    }
 
-  const trackLiveView = useCallback(
-    async (livestreamId: string) => {
-      if (
-        trackedLiveStreamIdRef.current === livestreamId
-      ) {
-        return;
-      }
+    trackedVideoIdRef.current = videoId;
 
-      trackedLiveStreamIdRef.current = livestreamId;
+    try {
+      await fetch("/api/analytics", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          video_id: videoId,
+          event_type: "video_view",
+          session_type: "tv",
+        }),
+      });
+    } catch {}
+  }, []);
 
-      try {
-        await fetch("/api/analytics", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            livestream_id: livestreamId,
-            event_type: "live_view",
-            session_type: "live",
-          }),
-        });
-      } catch {
-        // Analytics failure must never interrupt playback.
-      }
-    },
-    [],
-  );
+  const trackLiveView = useCallback(async (livestreamId: string) => {
+    if (trackedLiveStreamIdRef.current === livestreamId) {
+      return;
+    }
+
+    trackedLiveStreamIdRef.current = livestreamId;
+
+    try {
+      await fetch("/api/analytics", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          livestream_id: livestreamId,
+          event_type: "live_view",
+          session_type: "live",
+        }),
+      });
+    } catch {}
+  }, []);
 
   const clearAllTimers = useCallback(() => {
     clearTimer(errorTimerRef);
@@ -189,9 +182,7 @@ export default function PlaybackEngine({
     if (hlsRef.current) {
       try {
         hlsRef.current.destroy();
-      } catch {
-        // Ignore HLS cleanup errors.
-      }
+      } catch {}
 
       hlsRef.current = null;
     }
@@ -233,8 +224,7 @@ export default function PlaybackEngine({
     if (isLiveMode) {
       if (
         !currentElement.paused &&
-        currentElement.readyState >=
-          HTMLMediaElement.HAVE_CURRENT_DATA
+        currentElement.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
       ) {
         clearTimer(stallTimerRef);
 
@@ -257,9 +247,7 @@ export default function PlaybackEngine({
         setHasError(false);
         setAutoplayBlocked(false);
         setIsPlaying(true);
-      } catch {
-        // Allow HLS to recover naturally.
-      }
+      } catch {}
 
       return;
     }
@@ -289,7 +277,6 @@ export default function PlaybackEngine({
 
       setSelectedLiveStream(stream);
       setIsLiveMode(true);
-
       setIsLoading(true);
       setIsStalled(false);
       setHasError(false);
@@ -307,7 +294,6 @@ export default function PlaybackEngine({
 
     setSelectedLiveStream(null);
     setIsLiveMode(false);
-
     setIsLoading(true);
     setIsStalled(false);
     setHasError(false);
@@ -317,6 +303,10 @@ export default function PlaybackEngine({
     setDuration(0);
   }, [clearAllTimers, destroyHls]);
 
+  // --------------------------------------------------
+  // Source / HLS setup
+  // --------------------------------------------------
+
   useEffect(() => {
     const videoElement = videoRef.current;
 
@@ -325,6 +315,7 @@ export default function PlaybackEngine({
     }
 
     destroyHls();
+
     clearTimer(errorTimerRef);
     clearTimer(stallTimerRef);
 
@@ -347,14 +338,10 @@ export default function PlaybackEngine({
     const setupSource = async () => {
       try {
         videoElement.pause();
-
         videoElement.removeAttribute("src");
         videoElement.load();
 
-        if (
-          isLiveMode &&
-          source.includes(".m3u8")
-        ) {
+        if (isLiveMode && source.includes(".m3u8")) {
           if (
             videoElement.canPlayType(
               "application/vnd.apple.mpegurl",
@@ -437,58 +424,47 @@ export default function PlaybackEngine({
               },
             );
 
-            hls.on(
-              Hls.Events.ERROR,
-              (_event, data) => {
-                if (cancelled) {
-                  return;
-                }
+            hls.on(Hls.Events.ERROR, (_event, data) => {
+              if (cancelled || !data.fatal) {
+                return;
+              }
 
-                if (!data.fatal) {
-                  return;
-                }
+              if (
+                data.type ===
+                Hls.ErrorTypes.NETWORK_ERROR
+              ) {
+                try {
+                  hls.startLoad();
+                } catch {}
 
-                if (
-                  data.type ===
-                  Hls.ErrorTypes.NETWORK_ERROR
-                ) {
-                  try {
-                    hls.startLoad();
-                  } catch {
-                    // Ignore recovery errors.
+                return;
+              }
+
+              if (
+                data.type ===
+                Hls.ErrorTypes.MEDIA_ERROR
+              ) {
+                try {
+                  hls.recoverMediaError();
+                } catch {}
+
+                return;
+              }
+
+              clearTimer(errorTimerRef);
+
+              errorTimerRef.current =
+                window.setTimeout(() => {
+                  if (cancelled) {
+                    return;
                   }
 
-                  return;
-                }
-
-                if (
-                  data.type ===
-                  Hls.ErrorTypes.MEDIA_ERROR
-                ) {
-                  try {
-                    hls.recoverMediaError();
-                  } catch {
-                    // Ignore recovery errors.
-                  }
-
-                  return;
-                }
-
-                clearTimer(errorTimerRef);
-
-                errorTimerRef.current =
-                  window.setTimeout(() => {
-                    if (cancelled) {
-                      return;
-                    }
-
-                    setIsLoading(false);
-                    setIsStalled(false);
-                    setHasError(true);
-                    setIsPlaying(false);
-                  }, ERROR_RECOVERY_DELAY);
-              },
-            );
+                  setIsLoading(false);
+                  setIsStalled(false);
+                  setHasError(true);
+                  setIsPlaying(false);
+                }, ERROR_RECOVERY_DELAY);
+            });
 
             return;
           }
@@ -540,14 +516,11 @@ export default function PlaybackEngine({
 
       clearTimer(errorTimerRef);
       clearTimer(stallTimerRef);
-
       destroyHls();
 
       try {
         videoElement.pause();
-      } catch {
-        // Ignore cleanup errors.
-      }
+      } catch {}
     };
   }, [
     currentVideo?.id,
@@ -576,87 +549,106 @@ export default function PlaybackEngine({
     videoElement.muted = isMuted;
   }, [isMuted, volume]);
 
+  // --------------------------------------------------
+  // Empty state
+  // --------------------------------------------------
+
   if (!currentVideo && !isLiveMode) {
     return (
-      <main className="min-h-screen bg-black text-white">
-        <div className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-6">
-          <div className="text-center">
-            <h1 className="text-2xl font-semibold">
-              Football TV
-            </h1>
+      <main className="min-h-screen bg-[#05070d] text-white">
+        <div className="flex min-h-screen items-center justify-center px-6">
+          <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center shadow-2xl">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 via-transparent to-blue-500/10" />
 
-            <p className="mt-2 text-sm text-white/60">
-              No videos are currently available.
-            </p>
+            <div className="relative">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/10 text-lg font-black">
+                TV
+              </div>
+
+              <h1 className="mt-5 text-2xl font-bold">
+                {playlistName}
+              </h1>
+
+              <p className="mt-2 text-sm text-white/50">
+                No videos are currently available.
+              </p>
+            </div>
           </div>
         </div>
       </main>
     );
   }
 
-  const currentTitle = isLiveMode
-    ? selectedLiveStream?.title ?? "Live Game"
-    : currentVideo?.title ?? "Football TV";
-
-  const progressValue =
-    duration > 0
-      ? Math.min(
-          100,
-          Math.max(
-            0,
-            (currentTime / duration) * 100,
-          ),
-        )
-      : 0;
-
   return (
     <main
       className={
         embedMode
-          ? "min-h-0 w-full bg-black text-white"
-          : "min-h-screen bg-black text-white"
+          ? "min-h-screen w-full bg-[#05070d] text-white"
+          : "min-h-screen bg-[#05070d] text-white"
       }
     >
       <div
         className={
           embedMode
             ? "w-full"
-            : "mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8"
+            : "mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8"
         }
       >
-        {!embedMode && (
-          <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="flex items-center gap-3">
-                <span className="h-3 w-3 rounded-full bg-red-500" />
+        {/* ==================================================
+            PREMIUM TV HEADER
+        ================================================== */}
 
-                <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-                  Football TV
-                </h1>
+        <header
+          className={
+            embedMode
+              ? "relative overflow-hidden border-b border-white/10 bg-[#080b13] px-4 py-4 sm:px-6"
+              : "relative mb-5 overflow-hidden rounded-3xl border border-white/10 bg-[#080b13] px-5 py-5"
+          }
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-red-600/[0.08] via-transparent to-blue-600/[0.08]" />
+
+          <div className="relative flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-red-700 text-sm font-black shadow-lg shadow-red-950/40">
+                TV
               </div>
 
-              <p className="mt-1 text-sm text-white/50">
-                24/7 Football Academy TV
-              </p>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
+
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-400">
+                    {isLiveMode ? "Live Broadcast" : "24/7 TV"}
+                  </p>
+                </div>
+
+                <h1 className="mt-0.5 truncate text-lg font-black tracking-tight sm:text-xl">
+                  {playlistName}
+                </h1>
+              </div>
             </div>
 
             {isLiveMode && (
               <button
                 type="button"
                 onClick={returnToTV}
-                className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+                className="shrink-0 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
               >
-                Back to 24/7 TV
+                ← 24/7 TV
               </button>
             )}
-          </header>
-        )}
+          </div>
+        </header>
+
+        {/* ==================================================
+            MAIN PLAYER
+        ================================================== */}
 
         <section
           className={
             embedMode
-              ? "w-full overflow-hidden bg-black"
-              : "overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl"
+              ? "overflow-hidden bg-black"
+              : "overflow-hidden rounded-3xl border border-white/10 bg-[#080b13] shadow-2xl"
           }
         >
           <div className="relative aspect-video w-full bg-black">
@@ -724,10 +716,7 @@ export default function PlaybackEngine({
                   void trackVideoView(currentVideo.id);
                 }
 
-                if (
-                  isLiveMode &&
-                  selectedLiveStream
-                ) {
+                if (isLiveMode && selectedLiveStream) {
                   void trackLiveView(
                     selectedLiveStream.id,
                   );
@@ -752,10 +741,7 @@ export default function PlaybackEngine({
                   void trackVideoView(currentVideo.id);
                 }
 
-                if (
-                  isLiveMode &&
-                  selectedLiveStream
-                ) {
+                if (isLiveMode && selectedLiveStream) {
                   void trackLiveView(
                     selectedLiveStream.id,
                   );
@@ -852,29 +838,54 @@ export default function PlaybackEngine({
               controls={false}
             />
 
+            {/* LIVE BADGE */}
+
+            {isLiveMode && (
+              <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full border border-red-300/20 bg-red-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] shadow-lg shadow-red-950/40">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                Live
+              </div>
+            )}
+
+            {/* PLAYER LOADING */}
+
             {isLoading &&
               !hasError &&
               !autoplayBlocked && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/35">
-                  <div className="rounded-xl bg-black/70 px-5 py-4 text-center backdrop-blur-sm">
-                    <div className="mx-auto mb-3 h-7 w-7 animate-spin rounded-full border-2 border-white/25 border-t-white" />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[2px]">
+                  <div className="rounded-2xl border border-white/10 bg-black/70 px-6 py-5 text-center shadow-2xl backdrop-blur-xl">
+                    <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
 
-                    <p className="text-sm font-medium text-white">
+                    <p className="text-sm font-semibold text-white">
                       {isStalled
                         ? "Buffering..."
                         : isLiveMode
                           ? "Connecting to live stream..."
                           : "Loading TV..."}
                     </p>
+
+                    <p className="mt-1 text-[11px] text-white/40">
+                      {playlistName}
+                    </p>
                   </div>
                 </div>
               )}
 
+            {/* AUTOPLAY BLOCKED */}
+
             {autoplayBlocked && !hasError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/45">
-                <div className="rounded-2xl bg-black/80 px-6 py-5 text-center backdrop-blur-sm">
-                  <p className="text-sm text-white/70">
-                    Playback is ready.
+              <div className="absolute inset-0 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+                <div className="rounded-3xl border border-white/10 bg-black/80 px-7 py-6 text-center shadow-2xl">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-black">
+                    ▶
+                  </div>
+
+                  <p className="mt-4 text-base font-bold">
+                    Ready to watch
+                  </p>
+
+                  <p className="mt-1 text-xs text-white/45">
+                    Tap play to start the broadcast.
                   </p>
 
                   <button
@@ -897,28 +908,30 @@ export default function PlaybackEngine({
                           setAutoplayBlocked(true);
                         });
                     }}
-                    className="mt-4 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90"
+                    className="mt-5 rounded-xl bg-white px-6 py-3 text-sm font-bold text-black transition hover:bg-white/90"
                   >
-                    Play
+                    Start Watching
                   </button>
                 </div>
               </div>
             )}
 
+            {/* ERROR */}
+
             {hasError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+              <div className="absolute inset-0 flex items-center justify-center bg-black/65 backdrop-blur-sm">
                 <div className="max-w-sm px-6 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500/15 text-red-400">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 text-xl font-bold text-red-400">
                     !
                   </div>
 
-                  <h2 className="mt-4 text-lg font-semibold">
+                  <h2 className="mt-4 text-lg font-bold">
                     {isLiveMode
                       ? "Live stream unavailable"
                       : "Video unavailable"}
                   </h2>
 
-                  <p className="mt-2 text-sm text-white/55">
+                  <p className="mt-2 text-sm leading-6 text-white/50">
                     {isLiveMode
                       ? "The live stream could not be played right now."
                       : "This video could not be played."}
@@ -936,7 +949,7 @@ export default function PlaybackEngine({
                           selectedLiveStream,
                         );
                       }}
-                      className="mt-5 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90"
+                      className="mt-5 rounded-xl bg-white px-6 py-3 text-sm font-bold text-black transition hover:bg-white/90"
                     >
                       Retry Live Stream
                     </button>
@@ -946,7 +959,8 @@ export default function PlaybackEngine({
                       onClick={() => {
                         resetPlaybackState();
 
-                        const media = videoRef.current;
+                        const media =
+                          videoRef.current;
 
                         if (!media) {
                           return;
@@ -966,7 +980,7 @@ export default function PlaybackEngine({
                             setHasError(true);
                           });
                       }}
-                      className="mt-5 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90"
+                      className="mt-5 rounded-xl bg-white px-6 py-3 text-sm font-bold text-black transition hover:bg-white/90"
                     >
                       Retry
                     </button>
@@ -974,18 +988,15 @@ export default function PlaybackEngine({
                 </div>
               </div>
             )}
-
-            {isLiveMode && (
-              <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-red-600 px-3 py-1.5 text-xs font-bold uppercase tracking-wide shadow-lg">
-                <span className="h-2 w-2 rounded-full bg-white" />
-                Live
-              </div>
-            )}
           </div>
 
-          <div className="border-t border-white/10 bg-zinc-950 px-4 py-3">
+          {/* ==================================================
+              PLAYER CONTROLS
+          ================================================== */}
+
+          <div className="border-t border-white/10 bg-[#090c14] px-4 py-4 sm:px-5">
             {!isLiveMode && (
-              <div className="mb-3">
+              <div className="mb-4">
                 <input
                   type="range"
                   min="0"
@@ -1009,15 +1020,17 @@ export default function PlaybackEngine({
                       media.currentTime = value;
                     }
                   }}
-                  className="w-full"
+                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full"
                   style={{
-                    background: `linear-gradient(to right, white ${progressValue}%, rgba(255,255,255,0.15) ${progressValue}%)`,
+                    background: `linear-gradient(to right, #ef4444 ${progressValue}%, rgba(255,255,255,0.12) ${progressValue}%)`,
                   }}
                 />
               </div>
             )}
 
             <div className="flex flex-wrap items-center gap-3">
+              {/* PLAY */}
+
               <button
                 type="button"
                 aria-label={
@@ -1046,19 +1059,35 @@ export default function PlaybackEngine({
                     setIsPlaying(false);
                   }
                 }}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black transition hover:bg-white/90"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-sm font-black text-black shadow-lg transition hover:scale-105 hover:bg-white/90"
               >
                 {isPlaying ? "❚❚" : "▶"}
               </button>
 
+              {/* TIME */}
+
               {!isLiveMode && (
-                <span className="min-w-[100px] text-xs tabular-nums text-white/60">
+                <span className="min-w-[105px] text-xs font-medium tabular-nums text-white/50">
                   {formatTime(currentTime)} /{" "}
                   {formatTime(duration)}
                 </span>
               )}
 
+              {/* LIVE STATUS */}
+
+              {isLiveMode && (
+                <div className="flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1.5">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-red-400">
+                    Live Now
+                  </span>
+                </div>
+              )}
+
               <div className="ml-auto flex items-center gap-2">
+                {/* MUTE */}
+
                 <button
                   type="button"
                   aria-label={
@@ -1075,10 +1104,12 @@ export default function PlaybackEngine({
                       (previous) => !previous,
                     );
                   }}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 text-sm text-white transition hover:bg-white/10"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-sm transition hover:bg-white/[0.09]"
                 >
                   {isMuted ? "🔇" : "🔊"}
                 </button>
+
+                {/* VOLUME */}
 
                 <input
                   aria-label="Volume"
@@ -1102,11 +1133,14 @@ export default function PlaybackEngine({
 
                     if (media) {
                       media.volume = nextVolume;
-                      media.muted = nextVolume === 0;
+                      media.muted =
+                        nextVolume === 0;
                     }
                   }}
-                  className="w-20"
+                  className="hidden h-1.5 w-20 cursor-pointer appearance-none rounded-full sm:block"
                 />
+
+                {/* FULLSCREEN */}
 
                 <button
                   type="button"
@@ -1122,7 +1156,7 @@ export default function PlaybackEngine({
                       void media.requestFullscreen();
                     }
                   }}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 text-sm text-white transition hover:bg-white/10"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-base transition hover:bg-white/[0.09]"
                 >
                   ⛶
                 </button>
@@ -1131,53 +1165,70 @@ export default function PlaybackEngine({
           </div>
         </section>
 
-        {embedMode && isLiveMode && (
-          <div className="flex items-center justify-between gap-4 border-b border-white/10 bg-zinc-950 px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wider text-red-400">
-                Live Now
-              </p>
+        {/* ==================================================
+            NOW PLAYING
+        ================================================== */}
 
-              <p className="mt-1 truncate text-sm font-medium text-white">
+        <section className="border-b border-white/10 bg-[#070a11] px-4 py-5 sm:px-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-400">
+                  {isLiveMode
+                    ? "Live Now"
+                    : "Now Playing"}
+                </span>
+
+                {isLiveMode && (
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                )}
+              </div>
+
+              <h2 className="mt-1 truncate text-lg font-bold sm:text-xl">
                 {currentTitle}
+              </h2>
+
+              <p className="mt-1 text-xs text-white/35">
+                {playlistName}
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={returnToTV}
-              className="shrink-0 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/10"
-            >
-              Back to 24/7 TV
-            </button>
+            {!isLiveMode && videos.length > 0 && (
+              <div className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-white/45">
+                {currentIndex + 1} /{" "}
+                {videos.length}
+              </div>
+            )}
           </div>
-        )}
+        </section>
+
+        {/* ==================================================
+            LIVE GAMES
+        ================================================== */}
 
         {liveStreams.length > 0 && (
-          <section
-            className={
-              embedMode
-                ? "bg-black px-4 py-5 sm:px-6"
-                : "mt-6"
-            }
-          >
-            <div className="mb-3 flex items-end justify-between">
+          <section className="bg-[#05070d] px-4 py-6 sm:px-6">
+            <div className="mb-4 flex items-end justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-red-400">
-                  Live Games
-                </p>
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
 
-                <h2 className="mt-1 text-xl font-semibold">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-400">
+                    Live Games
+                  </p>
+                </div>
+
+                <h2 className="mt-1 text-xl font-black tracking-tight">
                   Watch Live
                 </h2>
               </div>
 
-              <span className="text-xs text-white/40">
+              <span className="rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-red-400">
                 {Math.min(
                   liveStreams.length,
                   3,
                 )}{" "}
-                live
+                Live
               </span>
             </div>
 
@@ -1197,41 +1248,56 @@ export default function PlaybackEngine({
                       onClick={() =>
                         selectLiveStream(stream)
                       }
-                      className={`group overflow-hidden rounded-2xl border text-left transition ${
+                      className={`group overflow-hidden rounded-2xl border text-left shadow-xl transition ${
                         isSelected
-                          ? "border-red-500/70 bg-red-500/10"
-                          : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
+                          ? "border-red-500/60 bg-red-500/[0.08] shadow-red-950/30"
+                          : "border-white/10 bg-white/[0.025] hover:border-white/20 hover:bg-white/[0.05]"
                       }`}
                     >
-                      <div className="relative aspect-video bg-zinc-900">
+                      <div className="relative aspect-video overflow-hidden bg-[#0b0f18]">
                         {stream.thumbnail_url ? (
                           <img
                             src={stream.thumbnail_url}
                             alt=""
-                            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
                           />
                         ) : (
-                          <div className="flex h-full items-center justify-center bg-gradient-to-br from-zinc-800 to-black">
-                            <span className="text-3xl">
+                          <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#151b29] to-black">
+                            <span className="text-4xl">
                               ⚽
                             </span>
                           </div>
                         )}
 
-                        <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-bold uppercase">
-                          <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
+
+                        <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-red-600 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider shadow-lg">
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
                           Live
                         </div>
+
+                        {isSelected && (
+                          <div className="absolute bottom-3 right-3 rounded-full border border-white/20 bg-black/70 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-md">
+                            Playing
+                          </div>
+                        )}
                       </div>
 
                       <div className="p-4">
-                        <h3 className="font-semibold">
+                        <h3 className="truncate font-bold">
                           {stream.title}
                         </h3>
 
-                        <p className="mt-1 text-xs text-white/45">
-                          {stream.channel_name}
-                        </p>
+                        {stream.channel_name && (
+                          <p className="mt-1 truncate text-xs text-white/40">
+                            {stream.channel_name}
+                          </p>
+                        )}
+
+                        <div className="mt-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-red-400">
+                          <span>Watch stream</span>
+                          <span>→</span>
+                        </div>
                       </div>
                     </button>
                   );
@@ -1240,155 +1306,152 @@ export default function PlaybackEngine({
           </section>
         )}
 
-        {!embedMode && (
-          <>
-            <section className="mt-6">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
-                  {isLiveMode
-                    ? "Live Now"
-                    : "Now Playing"}
-                </p>
+        {/* ==================================================
+            UP NEXT
+        ================================================== */}
 
-                <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                  <h2 className="text-xl font-semibold">
-                    {currentTitle}
-                  </h2>
+        {!isLiveMode && videos.length > 1 && (
+          <section className="border-t border-white/10 bg-[#070a11] px-4 py-6 sm:px-6">
+            <div className="mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">
+                Up Next
+              </p>
 
-                  {!isLiveMode &&
-                    videos.length > 0 && (
-                      <p className="text-sm text-white/40">
-                        {currentIndex + 1} /{" "}
-                        {videos.length}
-                      </p>
-                    )}
-                </div>
-              </div>
-            </section>
+              <h2 className="mt-1 text-xl font-black">
+                Coming Up
+              </h2>
+            </div>
 
-            {!isLiveMode &&
-              videos.length > 1 && (
-                <section className="mt-6">
-                  <div className="mb-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
-                      Up Next
-                    </p>
-
-                    <h2 className="mt-1 text-xl font-semibold">
-                      Coming Up
-                    </h2>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {videos
-                      .map((video, index) => ({
-                        video,
-                        index,
-                      }))
-                      .filter(
-                        ({ index }) =>
-                          index !== currentIndex,
-                      )
-                      .slice(0, 3)
-                      .map(
-                        ({ video, index }) => (
-                          <button
-                            key={video.id}
-                            type="button"
-                            onClick={() => {
-                              clearAllTimers();
-                              setCurrentIndex(index);
-                            }}
-                            className="flex overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] text-left transition hover:border-white/20 hover:bg-white/[0.06]"
-                          >
-                            <div className="h-20 w-32 shrink-0 bg-zinc-900">
-                              {video.thumbnail_url ? (
-                                <img
-                                  src={
-                                    video.thumbnail_url
-                                  }
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <div className="flex h-full items-center justify-center text-xl">
-                                  ⚽
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="min-w-0 p-3">
-                              <p className="truncate text-sm font-medium">
-                                {video.title}
-                              </p>
-
-                              {video.duration_seconds !==
-                                null && (
-                                <p className="mt-1 text-xs text-white/40">
-                                  {formatTime(
-                                    video.duration_seconds,
-                                  )}
-                                </p>
-                              )}
-                            </div>
-                          </button>
-                        ),
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {videos
+                .map((video, index) => ({
+                  video,
+                  index,
+                }))
+                .filter(
+                  ({ index }) =>
+                    index !== currentIndex,
+                )
+                .slice(0, 3)
+                .map(({ video, index }) => (
+                  <button
+                    key={video.id}
+                    type="button"
+                    onClick={() => {
+                      clearAllTimers();
+                      setCurrentIndex(index);
+                    }}
+                    className="group flex overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025] text-left transition hover:border-white/20 hover:bg-white/[0.05]"
+                  >
+                    <div className="relative h-24 w-36 shrink-0 overflow-hidden bg-[#0b0f18]">
+                      {video.thumbnail_url ? (
+                        <img
+                          src={video.thumbnail_url}
+                          alt=""
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-2xl">
+                          ⚽
+                        </div>
                       )}
-                  </div>
-                </section>
-              )}
 
-            {schedule.length > 0 && (
-              <section className="mt-6 pb-8">
-                <div className="mb-3">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
-                    Schedule
-                  </p>
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/30" />
+                    </div>
 
-                  <h2 className="mt-1 text-xl font-semibold">
-                    Upcoming
-                  </h2>
-                </div>
+                    <div className="min-w-0 flex-1 p-3">
+                      <p className="truncate text-sm font-bold">
+                        {video.title}
+                      </p>
 
-                <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-                  {schedule.map(
-                    (item, index) => (
-                      <div
-                        key={item.id}
-                        className={`flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between ${
-                          index !==
-                          schedule.length - 1
-                            ? "border-b border-white/10"
-                            : ""
-                        }`}
-                      >
-                        <div>
-                          <p className="font-medium">
-                            {item.playlist_name}
-                          </p>
-
-                          <p className="mt-1 text-xs text-white/40">
-                            Scheduled program
-                          </p>
-                        </div>
-
-                        <div className="text-sm text-white/60">
-                          {formatScheduleTime(
-                            item.start_time,
-                          )}{" "}
-                          –{" "}
-                          {formatScheduleTime(
-                            item.end_time,
+                      {video.duration_seconds !==
+                        null && (
+                        <p className="mt-1 text-[11px] text-white/35">
+                          {formatTime(
+                            video.duration_seconds,
                           )}
-                        </div>
-                      </div>
-                    ),
-                  )}
-                </div>
-              </section>
-            )}
-          </>
+                        </p>
+                      )}
+
+                      <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-red-400 opacity-70 transition group-hover:opacity-100">
+                        Play next →
+                      </p>
+                    </div>
+                  </button>
+                ))}
+            </div>
+          </section>
         )}
+
+        {/* ==================================================
+            SCHEDULE
+        ================================================== */}
+
+        {schedule.length > 0 && (
+          <section className="border-t border-white/10 bg-[#05070d] px-4 py-6 pb-10 sm:px-6">
+            <div className="mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">
+                Schedule
+              </p>
+
+              <h2 className="mt-1 text-xl font-black">
+                Upcoming Programs
+              </h2>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+              {schedule.map((item, index) => (
+                <div
+                  key={item.id}
+                  className={`flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 ${
+                    index !== schedule.length - 1
+                      ? "border-b border-white/10"
+                      : ""
+                  }`}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-bold text-white/50">
+                      {String(index + 1).padStart(
+                        2,
+                        "0",
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold">
+                        {item.playlist_name}
+                      </p>
+
+                      <p className="mt-1 text-[10px] uppercase tracking-wider text-white/30">
+                        Scheduled program
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-white/50">
+                    {formatScheduleTime(
+                      item.start_time,
+                    )}{" "}
+                    –{" "}
+                    {formatScheduleTime(
+                      item.end_time,
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ==================================================
+            FOOTER BRANDING
+        ================================================== */}
+
+        <footer className="border-t border-white/10 bg-[#05070d] px-4 py-5 text-center sm:px-6">
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/20">
+            {playlistName} • 24/7 Football TV
+          </p>
+        </footer>
       </div>
     </main>
   );
