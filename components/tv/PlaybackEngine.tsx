@@ -82,7 +82,7 @@ export default function PlaybackEngine({
   videos,
   liveStreams,
   schedule,
-  playlistName = "Football TV",
+  playlistName = "Dragao FC TV",
   embedMode = false,
 }: PlaybackEngineProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
