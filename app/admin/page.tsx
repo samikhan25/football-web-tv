@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
 import Link from "next/link";
+
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export default async function AdminPage() {
   const supabase = await createSupabaseServerClient();
@@ -13,19 +14,34 @@ export default async function AdminPage() {
     redirect("/login");
   }
 
-  const { data: profile, error } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("full_name, role")
     .eq("id", user.id)
     .single();
 
-  if (error || !profile) {
+  if (profileError || !profile) {
     redirect("/");
   }
 
   if (profile.role !== "admin") {
     redirect("/");
   }
+
+  // Get latest videos
+  const { data: recentVideos } = await supabase
+    .from("videos")
+    .select("id, title, created_at, thumbnail_url")
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  // Get active/upcoming livestreams
+  const { data: liveStreams } = await supabase
+    .from("livestreams")
+    .select("id, title, status, scheduled_at")
+    .in("status", ["live", "scheduled"])
+    .order("scheduled_at", { ascending: true })
+    .limit(5);
 
   return (
     <main className="min-h-screen bg-[#0b1020] text-white">
@@ -190,19 +206,67 @@ export default async function AdminPage() {
                   </div>
                 </div>
 
-                <div className="px-5 py-12 text-center">
+                <div className="divide-y divide-slate-800">
 
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-xl">
-                    ▶
-                  </div>
+                  {recentVideos && recentVideos.length > 0 ? (
+                    recentVideos.map((video) => (
+                      <Link
+                        key={video.id}
+                        href={`/admin/videos/${video.id}`}
+                        className="flex items-center gap-4 px-5 py-4 transition hover:bg-slate-800/40"
+                      >
 
-                  <p className="mt-4 text-sm font-semibold text-slate-300">
-                    No recent content
-                  </p>
+                        <div className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-800">
 
-                  <p className="mt-1 text-xs text-slate-500">
-                    Your latest videos will appear here.
-                  </p>
+                          {video.thumbnail_url ? (
+                            <img
+                              src={video.thumbnail_url}
+                              alt={video.title}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-lg">
+                              ▶
+                            </span>
+                          )}
+
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+
+                          <p className="truncate text-sm font-semibold text-white">
+                            {video.title}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            {formatDate(video.created_at)}
+                          </p>
+
+                        </div>
+
+                        <span className="text-slate-600">
+                          →
+                        </span>
+
+                      </Link>
+                    ))
+                  ) : (
+                    <div className="px-5 py-12 text-center">
+
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-xl">
+                        ▶
+                      </div>
+
+                      <p className="mt-4 text-sm font-semibold text-slate-300">
+                        No recent content
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        Your latest videos will appear here.
+                      </p>
+
+                    </div>
+                  )}
 
                 </div>
 
@@ -234,19 +298,81 @@ export default async function AdminPage() {
                   </div>
                 </div>
 
-                <div className="px-5 py-12 text-center">
+                <div className="divide-y divide-slate-800">
 
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-xl">
-                    ●
-                  </div>
+                  {liveStreams && liveStreams.length > 0 ? (
+                    liveStreams.map((stream) => (
+                      <Link
+                        key={stream.id}
+                        href={`/admin/livestreams/${stream.id}`}
+                        className="flex items-center gap-4 px-5 py-4 transition hover:bg-slate-800/40"
+                      >
 
-                  <p className="mt-4 text-sm font-semibold text-slate-300">
-                    No active livestreams
-                  </p>
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800">
 
-                  <p className="mt-1 text-xs text-slate-500">
-                    Active livestreams will appear here.
-                  </p>
+                          <span
+                            className={
+                              stream.status === "live"
+                                ? "text-red-400"
+                                : "text-slate-400"
+                            }
+                          >
+                            ●
+                          </span>
+
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+
+                          <p className="truncate text-sm font-semibold text-white">
+                            {stream.title}
+                          </p>
+
+                          <div className="mt-1 flex items-center gap-2">
+
+                            <span
+                              className={`text-[10px] font-bold uppercase ${
+                                stream.status === "live"
+                                  ? "text-red-400"
+                                  : "text-blue-400"
+                              }`}
+                            >
+                              {stream.status}
+                            </span>
+
+                            {stream.scheduled_at && (
+                              <span className="text-xs text-slate-500">
+                                {formatDate(stream.scheduled_at)}
+                              </span>
+                            )}
+
+                          </div>
+
+                        </div>
+
+                        <span className="text-slate-600">
+                          →
+                        </span>
+
+                      </Link>
+                    ))
+                  ) : (
+                    <div className="px-5 py-12 text-center">
+
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-xl">
+                        ●
+                      </div>
+
+                      <p className="mt-4 text-sm font-semibold text-slate-300">
+                        No active livestreams
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        Active livestreams will appear here.
+                      </p>
+
+                    </div>
+                  )}
 
                 </div>
 
@@ -313,20 +439,20 @@ export default async function AdminPage() {
           </div>
 
           {/* Mobile Bottom Navigation */}
-          <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-800 bg-slate-950/95 px-2 py-2 backdrop-blur lg:hidden">
+          <nav className="fixed inset-x-0 bottom-0 z-50 overflow-x-auto border-t border-slate-800 bg-slate-950/95 px-2 py-2 backdrop-blur lg:hidden">
 
-            <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
+            <div className="flex min-w-max items-center justify-center gap-1">
 
               <MobileNavItem
                 href="/admin"
                 icon="⌂"
-                label="Home"
+                label="Dashboard"
               />
 
               <MobileNavItem
                 href="/admin/videos"
                 icon="▶"
-                label="Videos"
+                label="Video Library"
               />
 
               <MobileNavItem
@@ -336,15 +462,27 @@ export default async function AdminPage() {
               />
 
               <MobileNavItem
+                href="/admin/schedule"
+                icon="◷"
+                label="Schedule"
+              />
+
+              <MobileNavItem
                 href="/admin/livestreams"
                 icon="●"
-                label="Live"
+                label="Live Streams"
               />
 
               <MobileNavItem
                 href="/admin/channels"
                 icon="▦"
                 label="Channels"
+              />
+
+              <MobileNavItem
+                href="/admin/analytics"
+                icon="↗"
+                label="Analytics"
               />
 
             </div>
@@ -432,15 +570,27 @@ function MobileNavItem({
   return (
     <Link
       href={href}
-      className="flex flex-col items-center justify-center rounded-lg px-2 py-2 text-[10px] font-medium text-slate-500 transition hover:bg-slate-900 hover:text-white"
+      className="flex min-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[10px] font-medium text-slate-500 transition hover:bg-slate-900 hover:text-white"
     >
       <span className="text-sm">
         {icon}
       </span>
 
-      <span className="mt-1">
+      <span className="mt-1 whitespace-nowrap">
         {label}
       </span>
     </Link>
   );
+}
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
