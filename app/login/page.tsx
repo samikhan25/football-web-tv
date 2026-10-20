@@ -1,12 +1,10 @@
+
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export default function LoginPage() {
-  const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -15,42 +13,36 @@ export default function LoginPage() {
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    console.log("LOGIN BUTTON PRESSED");
-
     setLoading(true);
     setMessage("Logging in...");
 
     try {
       const supabase = createSupabaseBrowserClient();
 
-      console.log("SUPABASE CLIENT CREATED");
-
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
 
-      console.log("LOGIN RESPONSE:", error);
-
       if (error) {
-        setLoading(false);
         setMessage(error.message);
         return;
       }
 
       setMessage("Login successful!");
 
-      router.push("/admin");
-      router.refresh();
+      // Navigate to the admin page after successful login.
+      window.location.replace("/admin");
     } catch (error) {
       console.error("LOGIN ERROR:", error);
 
-      setLoading(false);
       setMessage(
         error instanceof Error
           ? error.message
           : "Something went wrong during login."
       );
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -81,6 +73,7 @@ export default function LoginPage() {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
           required
         />
 
@@ -89,6 +82,7 @@ export default function LoginPage() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
           required
         />
 
@@ -98,6 +92,7 @@ export default function LoginPage() {
 
         {message && (
           <p
+            role="status"
             style={{
               margin: 0,
               wordBreak: "break-word",

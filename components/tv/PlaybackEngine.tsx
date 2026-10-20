@@ -555,7 +555,13 @@ export default function PlaybackEngine({
 
   if (!currentVideo && !isLiveMode) {
     return (
-      <main className="min-h-screen bg-[#05070d] text-white">
+      <main
+  className={
+    embedMode
+      ? "w-full bg-[#05070d] text-white"
+      : "min-h-screen bg-[#05070d] text-white"
+  }
+>
         <div className="flex min-h-screen items-center justify-center px-6">
           <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center shadow-2xl">
             <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 via-transparent to-blue-500/10" />
@@ -581,19 +587,19 @@ export default function PlaybackEngine({
 
   return (
     <main
-      className={
-        embedMode
-          ? "min-h-screen w-full bg-[#05070d] text-white"
-          : "min-h-screen bg-[#05070d] text-white"
-      }
-    >
-      <div
-        className={
-          embedMode
-            ? "w-full"
-            : "mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8"
-        }
-      >
+  className={
+    embedMode
+      ? "w-full bg-[#05070d] text-white"
+      : "min-h-screen bg-[#05070d] text-white"
+  }
+>
+  <div
+    className={
+      embedMode
+        ? "w-full min-w-0"
+        : "mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8"
+    }
+  >
         {/* ==================================================
             PREMIUM TV HEADER
         ================================================== */}

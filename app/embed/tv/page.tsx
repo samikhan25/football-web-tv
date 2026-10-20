@@ -35,6 +35,13 @@ type ChannelRow = {
   name: string;
 };
 
+type ScheduleRow = {
+  id: string;
+  start_time: string;
+  end_time: string;
+  playlists: { name: string } | { name: string }[] | null;
+};
+
 export default async function EmbedTVPage() {
   const supabase = await createSupabaseServerClient();
 
@@ -51,15 +58,23 @@ export default async function EmbedTVPage() {
 
   if (playlistError) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#070b14] px-6 text-white">
-        <div className="max-w-md text-center">
-          <h1 className="text-xl font-bold">
-            TV playback unavailable
-          </h1>
+      <main className="flex min-h-screen items-center justify-center bg-[#05070d] px-6 text-white">
+        <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center shadow-2xl">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 via-transparent to-blue-500/10" />
 
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            The active playlist could not be loaded.
-          </p>
+          <div className="relative">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] shadow-xl">
+              <span className="text-xl">TV</span>
+            </div>
+
+            <h1 className="mt-6 text-xl font-bold">
+              TV playback unavailable
+            </h1>
+
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              The active playlist could not be loaded.
+            </p>
+          </div>
         </div>
       </main>
     );
@@ -67,23 +82,31 @@ export default async function EmbedTVPage() {
 
   if (!playlist) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#070b14] px-6 text-white">
-        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 text-xl">
-            TV
+      <main className="flex min-h-screen items-center justify-center bg-[#05070d] px-6 text-white">
+        <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center shadow-2xl">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 via-transparent to-blue-500/10" />
+
+          <div className="relative">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 text-lg font-black">
+              TV
+            </div>
+
+            <h1 className="mt-6 text-xl font-bold">
+              No active playlist
+            </h1>
+
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              Please activate a playlist from the admin panel.
+            </p>
           </div>
-
-          <h1 className="mt-5 text-xl font-bold">
-            No active playlist
-          </h1>
-
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            Please activate a playlist from the admin panel.
-          </p>
         </div>
       </main>
     );
   }
+
+  // --------------------------------------------------
+  // Playlist videos
+  // --------------------------------------------------
 
   const {
     data: playlistItems,
@@ -107,15 +130,23 @@ export default async function EmbedTVPage() {
 
   if (playlistItemsError) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#070b14] px-6 text-white">
-        <div className="max-w-md text-center">
-          <h1 className="text-xl font-bold">
-            TV playback unavailable
-          </h1>
+      <main className="flex min-h-screen items-center justify-center bg-[#05070d] px-6 text-white">
+        <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center shadow-2xl">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 via-transparent to-blue-500/10" />
 
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            The playlist videos could not be loaded.
-          </p>
+          <div className="relative">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05]">
+              TV
+            </div>
+
+            <h1 className="mt-6 text-xl font-bold">
+              TV playback unavailable
+            </h1>
+
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              The playlist videos could not be loaded.
+            </p>
+          </div>
         </div>
       </main>
     );
@@ -231,8 +262,11 @@ export default async function EmbedTVPage() {
     .order("start_time", { ascending: true })
     .limit(6);
 
+  const typedScheduleRows =
+    (scheduleRows ?? []) as ScheduleRow[];
+
   const schedule: TVScheduleItem[] =
-    (scheduleRows ?? []).map((item) => {
+    typedScheduleRows.map((item) => {
       const rawPlaylist = item.playlists;
 
       const schedulePlaylist = Array.isArray(rawPlaylist)
@@ -243,18 +277,20 @@ export default async function EmbedTVPage() {
         id: item.id,
         start_time: item.start_time,
         end_time: item.end_time,
-        playlist_name: schedulePlaylist?.name ?? null,
+        playlist_name:
+          schedulePlaylist?.name ?? "Football TV Program",
       };
     });
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-black">
+    <main className="min-h-screen w-full overflow-x-hidden bg-[#05070d] text-white">
       <PlaybackEngine
-  videos={videos}
-  liveStreams={liveStreams}
-  schedule={schedule}
-  embedMode
-/>
-    </div>
+        videos={videos}
+        liveStreams={liveStreams}
+        schedule={schedule}
+        playlistName={playlist.name}
+        embedMode
+      />
+    </main>
   );
 }
